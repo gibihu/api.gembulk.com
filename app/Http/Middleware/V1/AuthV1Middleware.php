@@ -2,7 +2,7 @@
 
 namespace App\Http\Middleware\V1;
 
-use Gembulk\Core\Models\Users\ApiKey;
+use App\Models\Users\ApiKey;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,15 +36,14 @@ class AuthV1Middleware
             return response()->json([
                 'success' => false,
                 'message' => 'Invalid API key',
-                'code' => 403
+                'code' => 403,
             ], 403);
         }
 
         // (เสริม) ถ้าอยากส่ง user id ต่อไปใช้
-//        $request->merge([
-//            'api_key_id' => $validKey->id,
-//            'api_user_id' => $validKey->user_id ?? null
-//        ]);
+        $request->merge([
+            'api_key_id' => $validKey->id,
+        ]);
 
         return $next($request);
     }
