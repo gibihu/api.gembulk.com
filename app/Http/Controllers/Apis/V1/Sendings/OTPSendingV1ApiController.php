@@ -128,24 +128,13 @@ class OTPSendingV1ApiController extends Controller
 
             $campaign = Campaign::where('action_key', 'otp')->findOrFail($campaign_id);
 
-            if (!is_array($campaign->response_callback)) {
-                $status = $campaign->status_text;
-            } else {
-                $pending = $campaign->response_callback['pending'] ?? 0;
-                $failed  = $campaign->response_callback['failed'] ?? 0;
-
-                $status = ($pending == 0 && $failed == 0)
-                    ? Campaign::STATUS_COMPLETED
-                    : Campaign::STATUS_PENDING;
-            }
-
             return response()->json([
                 'success' => true,
                 'message' => 'Get Report Successfully',
                 'data' => [
                     'campaign_id' => $campaign_id,
                     'ref_id' => $campaign->data['ref_id'],
-                    'status' => $status,
+                    'status' => $campaign->status_text,
                     'sent_at' => $campaign->sent_at,
                     'updated_at' => $campaign->updated_at,
                     'created_at' => $campaign->created_at,
