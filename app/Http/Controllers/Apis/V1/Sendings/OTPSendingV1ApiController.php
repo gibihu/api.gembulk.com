@@ -118,14 +118,9 @@ class OTPSendingV1ApiController extends Controller
         }
     }
 
-    public function report(Request $request)
+    public function report(Request $request, $campaign_id)
     {
         try{
-            $request->validate([
-                'campaign_id' => 'required',
-            ]);
-            $campaign_id = $request->campaign_id;
-
             $campaign = Campaign::where('action_key', 'otp')->findOrFail($campaign_id);
 
             return response()->json([
@@ -133,6 +128,7 @@ class OTPSendingV1ApiController extends Controller
                 'message' => 'Get Report Successfully',
                 'data' => [
                     'campaign_id' => $campaign_id,
+                    'otp_code' => $campaign->data['otp_code'],
                     'ref_id' => $campaign->data['ref_id'],
                     'status' => $campaign->status_text,
                     'sent_at' => $campaign->sent_at,
