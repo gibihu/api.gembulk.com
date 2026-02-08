@@ -23,7 +23,7 @@ class OTPSendingV1ApiController extends Controller
             ]);
 
             $api = ApiKey::with('user.plan')->findOrFail($request->api_key_id);
-            if(!$api->options['otp']){
+            if (!isset($api->options['otp']) || !$api->options['otp']) {
                 throw new Exception("SMS not available");
             }
 

@@ -27,7 +27,7 @@ class SMSSendingV1ApiController extends Controller
 
             $api = ApiKey::with('user.plan')->findOrFail($request->api_key_id);
 
-            if(!$api->options['sms']){
+            if (!isset($api->options['sms']) || !$api->options['sms']) {
                 throw new Exception("SMS not available");
             }
 
