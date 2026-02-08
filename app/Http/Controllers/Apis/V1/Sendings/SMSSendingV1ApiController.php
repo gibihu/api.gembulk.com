@@ -12,18 +12,22 @@ use Exception;
 use Illuminate\Http\Request;
 use Throwable;
 
-class OTPSendingV1ApiController extends Controller
+class SMSSendingV1ApiController extends Controller
 {
     public function send(Request $request)
     {
         try{
             $request->validate([
-                'receiver' => 'required',
+                'receivers' => 'required|array',
                 'sender_name' => 'required|string',
+                'message' => 'required|string',
             ]);
+            $message = $request->message;
+            $receivers = $request->receivers;
 
             $api = ApiKey::with('user.plan')->findOrFail($request->api_key_id);
-            if(!$api->options['otp']){
+
+            if(!$api->options['sms']){
                 throw new Exception("SMS not available");
             }
 
@@ -48,42 +52,20 @@ class OTPSendingV1ApiController extends Controller
                 throw new Exception("Sender not allowed");
             }
 
-            $template = $api->template ?? "รหัสอ้างอิง [{{ref_id}}]:OTP ของคุณคือ {{otp_code}}";
-
-            $otp_code = random_int(100000, 999999);
-            $ref_id = $request->ref_id ?? rtrim(strtr(base64_encode(random_bytes(4)), '+/', '-_'), '=');
-
-            $data = [
-                '{{otp_code}}' => $otp_code,
-                '{{ref_id}}' => $ref_id,
-            ];
-            $message = str_replace(
-                array_keys($data),
-                array_values($data),
-                $template
-            );
-            $receiver = $request->receiver;
-
-            if (!is_array($receiver)) {
-                $receiver = [$receiver];
-            }
-
-            $cost = count($receiver) ?? 1;
-            $count_receiver = count($receiver);
+            $cost = count($receivers) ?? 1;
+            $count_receiver = count($receivers);
 
 
 //            $campaign = [
             $campaign = Campaign::create([
-                'name' => $request->campaign_name ?? 'api_otp_'.Carbon::now()->timestamp,
-                'action_key' => 'otp',
-                'receivers' => $receiver,
+                'name' => $request->campaign_name ?? 'sms_otp_'.Carbon::now()->timestamp,
+                'action_key' => 'sms',
+                'receivers' => $receivers,
                 'message' => $message,
                 'data' => [
                     'cost' => $cost,
                     'real_cost' => $cost * $count_receiver,
                     'receiver_count' => $count_receiver,
-                    'otp_code' => $otp_code,
-                    'ref_id' => $ref_id,
                 ],
                 'total_cost' => $cost * $count_receiver,
                 'status' => Campaign::STATUS_PENDING,
@@ -97,12 +79,11 @@ class OTPSendingV1ApiController extends Controller
             if($campaign) {
                 return response()->json([
                     'success' => true,
-                    'message' => 'OTP sent successfully',
+                    'message' => 'SMS sent successfully',
                     'data' => [
                         'campaign_id' => $campaign->id,
                         'message' => $message,
-                        'ref_id' => $ref_id,
-                        'otp_code' => $otp_code,
+                        'cost' => $cost,
                         'credits' => $user->credits,
                     ],
                     'code' => 201,
@@ -127,16 +108,37 @@ class OTPSendingV1ApiController extends Controller
     public function report(Request $request, $campaign_id)
     {
         try{
-            $campaign = Campaign::where('action_key', 'otp')->where('id', $campaign_id)->firstOrFail();
+            $campaign = Campaign::where('action_key', 'sms')->where('id', $campaign_id)->firstOrFail();
+            $report = $campaign->response_report_callback;
+            $response = $campaign->response_callback;
 
             return response()->json([
                 'success' => true,
                 'message' => 'Get Report Successfully',
                 'data' => [
+                    'success' => true,
                     'campaign_id' => $campaign_id,
-                    'otp_code' => $campaign->data['otp_code'],
-                    'ref_id' => $campaign->data['ref_id'],
-                    'status' => $campaign->status_text,
+                    'campaign_name' => $campaign->name,
+
+                    'total_receiver' =>
+                        data_get($report, 'total_receiver')
+                        ?? data_get($response, 'total_receiver')
+                            ?? $campaign->receivers->count(),
+
+                    'sent' => data_get($report, 'sent') ?? data_get($response, 'sent') ?? 0,
+                    'failed' => data_get($report, 'failed') ?? data_get($response, 'failed') ?? 0,
+                    'pending' => data_get($report, 'pending') ?? data_get($response, 'pending') ?? 0,
+                    'passed' => data_get($report, 'passed') ?? data_get($response, 'passed') ?? 0,
+
+                    'credits_refund' =>
+                        data_get($report, 'credits_refund')
+                        ?? data_get($response, 'credits_refund')
+                            ?? 0,
+
+                    'status' =>
+                        data_get($report, 'status')
+                        ?? data_get($response, 'status')
+                            ?? $campaign->status_text,
                     'sent_at' => $campaign->sent_at,
                     'updated_at' => $campaign->updated_at,
                     'created_at' => $campaign->created_at,
